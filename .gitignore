@@ -1,0 +1,11 @@
+# Build Files
+dist/
+
+# Temporary Files
+tmp/
+
+# Virtual Environment
+.venv/
+
+# Cache Files
+**/__pycache__/
