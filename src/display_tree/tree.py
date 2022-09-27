@@ -1,5 +1,6 @@
-from typing import Any, List, Optional, Tuple
+from typing import Any, List, Optional, Set, Tuple
 
+debug_val = 0
 
 class Tree:
     # Minimalistic Constructor
@@ -49,6 +50,7 @@ class Tree:
         if self.isLeaf():
             self._height = 1
             self._width = len(str(self.value))
+            self._sub_width = self._width
         else:
             sub_height: int = 0
             sub_width: int = 0
@@ -67,9 +69,8 @@ class Tree:
             left_padding = extra_padding // 2
             right_padding = extra_padding - left_padding
 
-            if not self.isLeaf():
-                self.children[0]._pad_left = left_padding
-                self.children[-1]._pad_right = right_padding
+            self._pad_left = left_padding
+            self._pad_right = right_padding
 
         # Update child nodes recursively
         for child in self.children:
@@ -84,13 +85,19 @@ class Tree:
         return [' ' * width] * height
 
     def _default_padding_block(self):
-        return self._padding_block(height=2 * (self._height) - 1, width=self.padding)
+        return self._padding_block(height=2 * (self._height - 1), width=self.padding)
 
     @staticmethod
-    def _pad_block(block: List[str], height: int):
-        width: int = len(block[0])
-        while len(block) < height:
-            block.append(' ' * width)
+    def _expand_block(block: List[str], height: int = 0, width: int = 0) -> List[str]:
+        target_height: int = len(block) if height == 0 else height
+        target_width: int = len(block[0]) if width == 0 else width
+        expanded_block: List[str] = []
+        for i in range(target_height):
+            if i < len(block):
+                expanded_block.append(f"{block[i]:<{target_width}}")
+            else:
+                expanded_block.append(' ' * target_width)
+        return expanded_block
 
     @staticmethod
     def _pad_branch(branch: str, width: int, bal_coef: int):
@@ -116,11 +123,10 @@ class Tree:
 
     def _block(self) -> List[str]:
         if self.isLeaf():
-            # Leaf Node
-            # return self._hstack_blocks(blocks=[left_padding, [str(self.symbol())], right_padding])
+            # Leaf node
             return [' ' * self._pad_left + self.symbol() + ' ' * self._pad_right]
         else:
-            # Internal Node
+            # Internal node
 
             # Current block header
             block_head = [f"{self.symbol():^{self._width}}"]
@@ -128,6 +134,8 @@ class Tree:
             # Child Blocks
             child_blocks: List[List[str]] = []
             for i, child in enumerate(self.children):
+                global debug_val
+                debug_val += 1
                 # Determine branch type
                 if len(self.children) == 1:
                     branch = self.branches[1]
@@ -142,7 +150,7 @@ class Tree:
                 child_block = child._block()
                 child_branch = self._pad_branch(branch=branch, width=child._width, bal_coef=child._bal_coef)
                 child_block.insert(0, child_branch)
-                self._pad_block(block=child_block, height=2 * (self._height - 1))
+                child_block = self._expand_block(block=child_block, height=2 * (self._height - 1))
 
                 # If not first block, append padding block first
                 if i > 0:
@@ -151,14 +159,13 @@ class Tree:
                 # Append the child block
                 child_blocks.append(child_block)
 
-
             # Padding blocks
             left_padding_block = self._padding_block(height=2 * (self._height - 1), width=self._pad_left)
             right_padding_block = self._padding_block(height=2 * (self._height - 1), width=self._pad_right)
-            print(child_blocks)
 
             # Concatenate the blocks
             block_body: List[str] = self._hstack_blocks(blocks=[left_padding_block, *child_blocks, right_padding_block])
+            # block_body: List[str] = self._hstack_blocks(blocks=child_blocks)
             complete_block: List[str] = self._vstack_blocks(blocks=[block_head, block_body])
 
             return complete_block
@@ -180,9 +187,29 @@ class Tree:
 
         return self._resolve_block(block=block)
 
-    def debug(self, depth: int = 0):
+    @staticmethod
+    def _verify_block(block: List[str]):
+        if len(block) > 0:
+            width: int = len(block[0])
+            for layer in block:
+                if len(layer) != width:
+                    raise ValueError("Invalid block")
+
+    def debug(self, depth: int = 0, props: Tuple = ("v", "h", "w", "_w", "bc", "pl", "pr")):
         if depth == 0:
             self._update_dimensions()
-        print("L " * depth + f"v: {str(self.value)}; p: {self.padding}; b: {self.branches}; h: {self._height}; w: {self._width}; _w: {self._sub_width}; bc: {self._bal_coef}")
+        definitions = {
+            "v": self.value,
+            "p": self.padding,
+            "b": self.branches,
+            "h": self._height,
+            "w": self._width,
+            "_w": self._sub_width,
+            "bc": self._bal_coef,
+            "pl": self._pad_left,
+            "pr": self._pad_right,
+        }
+        info = "; ".join(map(lambda x: f"{x}:{definitions.get(x)}", props))
+        print("  " * (depth - 1) + ("L " if depth >= 1 else "") + info)
         for child in self.children:
             child.debug(depth=depth + 1)
